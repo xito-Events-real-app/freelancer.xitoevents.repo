@@ -1,1 +1,3 @@
-# freelancer.xitoevents.repo
+# Welcome to your Lovable project
+
+TODO: Document your project here
