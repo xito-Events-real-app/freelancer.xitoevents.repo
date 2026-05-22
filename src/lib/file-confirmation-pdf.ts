@@ -1,0 +1,126 @@
+import jsPDF from "jspdf";
+import { FileRecord } from "./files-api";
+import { nepaliMonthsEnglish } from "./nepali-date";
+
+function buildPDF(file: FileRecord, companyName: string): jsPDF {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const w = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, w, 45, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "bold");
+  doc.text(companyName.toUpperCase(), w / 2, 22, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("File Backup Confirmation Receipt", w / 2, 32, { align: "center" });
+
+  doc.setFillColor(249, 115, 22);
+  doc.rect(20, 48, w - 40, 1.5, "F");
+
+  let y = 60;
+  doc.setTextColor(30, 30, 30);
+
+  const addRow = (label: string, value: string) => {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(label, 25, y);
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(value || "-", w - 80 - 25);
+    doc.text(lines, 80, y);
+    y += 8 + Math.max(0, (lines.length - 1) * 5);
+  };
+
+  const nepaliDate = (() => {
+    if (file.event_year && file.event_month && file.event_day) {
+      const mIdx = parseInt(String(file.event_month));
+      const monthName =
+        mIdx >= 1 && mIdx <= 12 ? nepaliMonthsEnglish[mIdx - 1] : String(file.event_month);
+      return `${monthName} ${file.event_day}, ${file.event_year}`;
+    }
+    return file.registered_date_bs || "-";
+  })();
+
+  addRow("Client Name", file.client_name || "-");
+  addRow("Event Name", file.event_name || "-");
+  addRow("Date (BS)", nepaliDate);
+  addRow("Date (AD)", file.event_date_ad || "-");
+  addRow("Freelancer", file.freelancer_name || "-");
+  addRow("Role", file.freelancer_type || "-");
+  addRow("Side", file.side || "-");
+  addRow("Card", file.card_label || "-");
+  addRow("Format", file.format_type || "-");
+  addRow("Size", file.size_gb ? `${file.size_gb} GB` : "-");
+  addRow("No. of Items", file.number_of_items ? String(file.number_of_items) : "-");
+
+  y += 4;
+  doc.setFillColor(226, 232, 240);
+  doc.rect(25, y, w - 50, 0.5, "F");
+  y += 10;
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text("1st Backup Details", 25, y);
+  y += 10;
+
+  doc.setFontSize(10);
+  doc.setTextColor(30, 30, 30);
+  addRow("Device", file.backup_1_device_name || "-");
+  addRow("Path", file.final_generated_path || "-");
+  addRow(
+    "Backed Up At",
+    file.backup_1_recorded_at
+      ? new Date(file.backup_1_recorded_at).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : "-"
+  );
+  addRow("Who Copied", file.who_copied || "-");
+
+  y += 10;
+  doc.setFillColor(249, 115, 22);
+  doc.rect(20, y, w - 40, 0.5, "F");
+  y += 8;
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(
+    `Generated on ${new Date().toLocaleString("en-US", {
+      dateStyle: "long",
+      timeStyle: "short",
+    })}`,
+    w / 2,
+    y,
+    { align: "center" }
+  );
+  y += 5;
+  doc.text(`${companyName} • File Management System`, w / 2, y, { align: "center" });
+  y += 5;
+  doc.setTextColor(59, 130, 246);
+  doc.text("https://freelancer.xitoevents.com", w / 2, y, { align: "center" });
+
+  return doc;
+}
+
+function safeFileName(file: FileRecord, companyName: string) {
+  const co = (companyName || "Xito").replace(/\s+/g, "_");
+  const client = (file.client_name || "").replace(/\s+/g, "_");
+  const fl = (file.freelancer_name || "").replace(/\s+/g, "_");
+  return `${co}_Confirmation_${client}_${fl}.pdf`;
+}
+
+export function downloadConfirmationPDF(file: FileRecord, companyName: string) {
+  const doc = buildPDF(file, companyName);
+  doc.save(safeFileName(file, companyName));
+}
+
+export function getConfirmationPDFFile(file: FileRecord, companyName: string): File {
+  const doc = buildPDF(file, companyName);
+  const blob = doc.output("blob");
+  return new File([blob], safeFileName(file, companyName), { type: "application/pdf" });
+}

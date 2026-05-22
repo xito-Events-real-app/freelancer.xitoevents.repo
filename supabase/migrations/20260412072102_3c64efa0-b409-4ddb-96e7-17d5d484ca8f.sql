@@ -1,0 +1,2 @@
+ALTER TABLE public.agency_staff_invitations DROP CONSTRAINT agency_staff_invitations_agency_user_id_invited_user_id_key;
+ALTER TABLE public.agency_staff_invitations ADD CONSTRAINT agency_staff_invitations_agency_user_type_key UNIQUE (agency_user_id, invited_user_id, type);

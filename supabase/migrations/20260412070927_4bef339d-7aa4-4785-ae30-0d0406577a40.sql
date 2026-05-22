@@ -1,0 +1,1 @@
+ALTER TABLE public.agency_staff_invitations ADD COLUMN type text NOT NULL DEFAULT 'staff';
