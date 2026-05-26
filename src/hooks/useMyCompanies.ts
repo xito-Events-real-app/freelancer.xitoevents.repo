@@ -18,16 +18,9 @@ export function useMyCompanies() {
     queryKey: ['my-companies', user?.id],
     queryFn: async () => {
       if (!user) return [] as MyCompany[];
-      try {
-        const { data, error } = await supabase.rpc('staff_company_roles' as any, { _staff: user.id });
-        if (error) {
-          console.warn('[useMyCompanies] RPC failed, returning empty:', error.message);
-          return [] as MyCompany[];
-        }
-        return ((data as any[]) || []) as MyCompany[];
-      } catch {
-        return [] as MyCompany[];
-      }
+      const { data, error } = await supabase.rpc('staff_company_roles' as any, { _staff: user.id });
+      if (error) throw error;
+      return ((data as any[]) || []) as MyCompany[];
     },
     enabled: !!user,
     staleTime: 30_000,

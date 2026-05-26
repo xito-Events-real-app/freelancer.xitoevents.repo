@@ -7,18 +7,15 @@ const corsHeaders = {
 };
 
 // =====================================================
-// Bucket configuration map
-// Each bucket has its own public URL and a key-prefix allowlist.
-// Adding new buckets in the future = add an entry here.
+// Bucket configuration map (JWT-authenticated buckets)
+// The photography bucket uses portal-token auth handled
+// separately at the top of the request handler.
 // =====================================================
 type BucketConfig = {
   bucket: string;
-  publicUrlEnv: string; // env var name holding the bucket's public base URL
-  // returns true if the key is allowed for the given user
+  publicUrlEnv: string;
   validateKey: (key: string, userId: string) => boolean;
-  // returns true if the user has permission to upload to this bucket
   authorize: (ctx: AuthorizeCtx) => Promise<boolean>;
-  // optional async key-level check (e.g. venue not soft-deleted)
   validateKeyAsync?: (
     key: string,
     supabaseAdmin: ReturnType<typeof createClient>
@@ -31,14 +28,12 @@ type AuthorizeCtx = {
 };
 
 const BUCKETS: Record<string, BucketConfig> = {
-  // Default freelancer bucket - user-scoped paths
   "freelancer-xitoevents": {
     bucket: "freelancer-xitoevents",
     publicUrlEnv: "R2_PUBLIC_URL",
     validateKey: (key, userId) => key.startsWith(`${userId}/`),
     authorize: async () => true,
   },
-  // Venue bucket - admin only, keys under venues/{venue_id}/
   "venue-xitoevents": {
     bucket: "venue-xitoevents",
     publicUrlEnv: "R2_VENUE_PUBLIC_URL",
@@ -59,6 +54,8 @@ const BUCKETS: Record<string, BucketConfig> = {
     },
   },
 };
+
+const PHOTOGRAPHY_BUCKET = "xito-photography-xitoevents-com";
 
 // =====================================================
 // S3-compatible signing for Cloudflare R2
@@ -225,34 +222,45 @@ function resolvePublicUrl(envName: string): string {
   return url.replace(/\/$/, "");
 }
 
+// =====================================================
+// Per-client rate limiter for portal uploads.
+// NOTE: In-memory Map — per edge-function instance only, resets on cold
+// start. Acceptable at current scale. If portal upload traffic grows
+// significantly, move to a Durable Object or KV-backed counter so the
+// limit holds across instances.
+// =====================================================
+const rateBuckets = new Map<string, number[]>();
+function rateLimited(clientId: string, max = 10, windowMs = 60_000): boolean {
+  const now = Date.now();
+  const arr = (rateBuckets.get(clientId) || []).filter((t) => now - t < windowMs);
+  if (arr.length >= max) {
+    rateBuckets.set(clientId, arr);
+    return true;
+  }
+  arr.push(now);
+  rateBuckets.set(clientId, arr);
+  return false;
+}
+
+// Parse a full public R2 URL back to a key relative to the bucket public base.
+function urlToKey(publicUrlBase: string, url: string | null): string | null {
+  if (!url) return null;
+  const base = publicUrlBase.replace(/\/$/, "");
+  if (!url.startsWith(base + "/")) return null;
+  return url.slice(base.length + 1);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonResponse(401, { error: "Missing authorization header" });
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return jsonResponse(401, { error: "Unauthorized" });
-
-    // Determine admin
-    const { data: adminCheck } = await supabaseAdmin.rpc("has_role", {
-      _user_id: user.id,
-      _role: "admin",
-    });
-    const isAdmin = !!adminCheck;
-
-    // R2 creds
     const accountId = Deno.env.get("R2_ACCOUNT_ID");
     const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID");
     const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY");
@@ -261,19 +269,195 @@ Deno.serve(async (req) => {
     }
 
     const formData = await req.formData();
-    const action = (formData.get("action") as string) || "upload";
     const bucketParam = (formData.get("bucket") as string) || "freelancer-xitoevents";
+
+    // =====================================================
+    // BRANCH A — Photography bucket (portal-token auth)
+    // =====================================================
+    if (bucketParam === PHOTOGRAPHY_BUCKET) {
+      // Photography bucket uses its OWN R2 token (scoped to this bucket only).
+      const photoAccessKeyId = Deno.env.get("R2_PHOTO_ACCESS_KEY_ID") || accessKeyId;
+      const photoSecretAccessKey = Deno.env.get("R2_PHOTO_SECRET_ACCESS_KEY") || secretAccessKey;
+      const clientId = (formData.get("client_id") as string) || "";
+      const token = (formData.get("token") as string) || "";
+      const kind = (formData.get("kind") as string) || ""; // couple | family | delete-family | reference | delete-reference
+      const memberIdRaw = (formData.get("member_id") as string) || "";
+      const refIdRaw = (formData.get("ref_id") as string) || "";
+
+      if (!clientId || !token) {
+        return jsonResponse(400, { error: "client_id and token are required" });
+      }
+      if (!["couple", "family", "delete-family", "reference", "delete-reference"].includes(kind)) {
+        return jsonResponse(400, { error: "Invalid kind" });
+      }
+
+      // 1. Validate token BEFORE reading any file body.
+      const { data: verifyRows, error: verifyErr } = await supabaseAdmin.rpc(
+        "portal_verify_token",
+        { p_client: clientId, p_token: token },
+      );
+      if (verifyErr || !verifyRows || (Array.isArray(verifyRows) && verifyRows.length === 0)) {
+        return jsonResponse(401, { error: "Invalid portal token" });
+      }
+      const verified = Array.isArray(verifyRows) ? verifyRows[0] : verifyRows;
+      const agencySlug: string | null = verified.agency_slug;
+      if (!agencySlug) {
+        return jsonResponse(500, { error: "Agency has no slug; cannot derive storage path" });
+      }
+
+      // 2. Rate-limit per client.
+      if (rateLimited(clientId)) {
+        return jsonResponse(429, { error: "Too many uploads, please wait a minute" });
+      }
+
+      const publicUrlBase = resolvePublicUrl("R2_PHOTOGRAPHY_PUBLIC_URL");
+      if (!publicUrlBase) return jsonResponse(500, { error: "Missing env R2_PHOTOGRAPHY_PUBLIC_URL" });
+
+      // ----- delete-family path -----
+      // Order: delete DB row first via RPC, then R2 object.
+      // If R2 delete fails, log silently — a dangling R2 object is cheaper
+      // to deal with than a dangling DB row with a broken photo.
+      if (kind === "delete-family") {
+        if (!memberIdRaw) return jsonResponse(400, { error: "member_id required" });
+        const { data: oldUrl, error: delErr } = await supabaseAdmin.rpc(
+          "portal_delete_family_member",
+          { p_client: clientId, p_token: token, p_member_id: memberIdRaw },
+        );
+        if (delErr) return jsonResponse(400, { error: delErr.message });
+        const oldKey = urlToKey(publicUrlBase, oldUrl as string | null);
+        if (oldKey) {
+          try {
+            await deleteFromR2(accountId, photoAccessKeyId, photoSecretAccessKey, PHOTOGRAPHY_BUCKET, oldKey);
+          } catch (e) {
+            console.warn("[photo bucket] R2 delete after row-delete failed (ignored):", e);
+          }
+        }
+        return jsonResponse(200, { success: true });
+      }
+
+      // ----- delete-reference path -----
+      if (kind === "delete-reference") {
+        if (!refIdRaw) return jsonResponse(400, { error: "ref_id required" });
+        const { data: oldUrl, error: delErr } = await supabaseAdmin.rpc(
+          "portal_delete_reference",
+          { p_client: clientId, p_token: token, p_ref_id: refIdRaw },
+        );
+        if (delErr) return jsonResponse(400, { error: delErr.message });
+        const oldKey = urlToKey(publicUrlBase, oldUrl as string | null);
+        if (oldKey) {
+          try {
+            await deleteFromR2(accountId, photoAccessKeyId, photoSecretAccessKey, PHOTOGRAPHY_BUCKET, oldKey);
+          } catch (e) {
+            console.warn("[photo bucket] R2 delete after ref-delete failed (ignored):", e);
+          }
+        }
+        return jsonResponse(200, { success: true });
+      }
+
+      // ----- upload path (couple | family) -----
+      const file = formData.get("file") as File | null;
+      if (!file) return jsonResponse(400, { error: "No file provided" });
+      const HARD_CAP = 210 * 1024; // 200KB + small headroom for multipart overhead
+      if (file.size > HARD_CAP) {
+        return jsonResponse(400, { error: "Photo is over 200KB after compression. Please try again." });
+      }
+
+      let key = "";
+      let priorKey: string | null = null;
+
+      if (kind === "couple") {
+        const { data: clientRow } = await supabaseAdmin
+          .from("agency_clients")
+          .select("id, couple_photo_url")
+          .eq("id", clientId)
+          .maybeSingle();
+        if (!clientRow) return jsonResponse(404, { error: "Client not found" });
+        priorKey = urlToKey(publicUrlBase, clientRow.couple_photo_url);
+        key = `${agencySlug}/clients/${clientId}/couple/cover-${Date.now()}.jpg`;
+      } else if (kind === "family") {
+        if (!memberIdRaw) return jsonResponse(400, { error: "member_id required for family upload" });
+        const { data: memberRow, error: mErr } = await supabaseAdmin
+          .from("agency_client_family_members")
+          .select("id, client_id, photo_url")
+          .eq("id", memberIdRaw)
+          .maybeSingle();
+        if (mErr || !memberRow) return jsonResponse(404, { error: "Family member not found" });
+        if (memberRow.client_id !== clientId) {
+          return jsonResponse(403, { error: "Member does not belong to this client" });
+        }
+        priorKey = urlToKey(publicUrlBase, memberRow.photo_url);
+        key = `${agencySlug}/clients/${clientId}/family/${memberIdRaw}.jpg`;
+      } else {
+        // reference upload
+        if (!refIdRaw) return jsonResponse(400, { error: "ref_id required for reference upload" });
+        const { data: refRow, error: rErr } = await supabaseAdmin
+          .from("client_portal_references")
+          .select("id, client_id, image_url")
+          .eq("id", refIdRaw)
+          .maybeSingle();
+        if (rErr || !refRow) return jsonResponse(404, { error: "Reference not found" });
+        if (refRow.client_id !== clientId) {
+          return jsonResponse(403, { error: "Reference does not belong to this client" });
+        }
+        priorKey = urlToKey(publicUrlBase, refRow.image_url);
+        key = `${agencySlug}/clients/${clientId}/references/${refIdRaw}.jpg`;
+      }
+
+      // Delete old object first (best-effort).
+      if (priorKey && priorKey !== key) {
+        try {
+          await deleteFromR2(accountId, photoAccessKeyId, photoSecretAccessKey, PHOTOGRAPHY_BUCKET, priorKey);
+        } catch (e) {
+          console.warn("[photo bucket] prior R2 delete failed (continuing):", e);
+        }
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const body = new Uint8Array(arrayBuffer);
+      await uploadToR2(
+        accountId, photoAccessKeyId, photoSecretAccessKey,
+        PHOTOGRAPHY_BUCKET, key, body,
+        file.type || "image/jpeg",
+      );
+
+      return jsonResponse(200, {
+        success: true,
+        url: `${publicUrlBase}/${key}`,
+        key,
+        bucket: PHOTOGRAPHY_BUCKET,
+      });
+    }
+
+    // =====================================================
+    // BRANCH B — JWT-authenticated buckets (existing flow)
+    // =====================================================
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return jsonResponse(401, { error: "Missing authorization header" });
+
+    const supabase = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return jsonResponse(401, { error: "Unauthorized" });
+
+    const { data: adminCheck } = await supabaseAdmin.rpc("has_role", {
+      _user_id: user.id,
+      _role: "admin",
+    });
+    const isAdmin = !!adminCheck;
+
     const bucketCfg = BUCKETS[bucketParam];
     if (!bucketCfg) return jsonResponse(400, { error: `Unknown bucket: ${bucketParam}` });
 
-    // Authorize bucket access
     const ok = await bucketCfg.authorize({ userId: user.id, isAdmin });
     if (!ok) return jsonResponse(403, { error: "Not authorized for this bucket" });
 
     const publicUrlBase = resolvePublicUrl(bucketCfg.publicUrlEnv);
     if (!publicUrlBase) return jsonResponse(500, { error: `Missing env ${bucketCfg.publicUrlEnv}` });
 
-    // -------- DELETE --------
+    const action = (formData.get("action") as string) || "upload";
+
     if (action === "delete") {
       const filePath = (formData.get("file_path") as string) || (formData.get("key") as string);
       if (!filePath) return jsonResponse(400, { error: "file_path/key required" });
@@ -284,21 +468,15 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { success: true });
     }
 
-    // -------- UPLOAD --------
     const file = formData.get("file") as File | null;
     if (!file) return jsonResponse(400, { error: "No file provided" });
 
     const maxSize = 20 * 1024 * 1024;
     if (file.size > maxSize) return jsonResponse(400, { error: "File too large (max 20MB)" });
 
-    // ---- Key derivation ----
     let key: string;
 
     if (bucketCfg.bucket === "venue-xitoevents") {
-      // Venue bucket: caller specifies key_prefix (one of)
-      //   venues/{uuid}/photos/   -> append {ulid}.jpg
-      //   venues/{uuid}/avatar    -> avatar.jpg
-      //   venues/{uuid}/cover     -> cover.jpg
       const keyPrefix = (formData.get("key_prefix") as string) || "";
       const photoMatch = keyPrefix.match(/^venues\/([0-9a-f-]{36})\/photos\/?$/);
       const avatarMatch = keyPrefix.match(/^venues\/([0-9a-f-]{36})\/avatar$/);
@@ -313,13 +491,11 @@ Deno.serve(async (req) => {
       } else {
         return jsonResponse(400, { error: "Invalid key_prefix for venue bucket" });
       }
-      // Soft-deleted check
       if (bucketCfg.validateKeyAsync) {
         const chk = await bucketCfg.validateKeyAsync(key, supabaseAdmin);
         if (!chk.ok) return jsonResponse(403, { error: chk.reason || "Key check failed" });
       }
     } else {
-      // Legacy freelancer flow: category-based
       const category = (formData.get("category") as string) || "media";
       const valid = ["avatars", "posts", "cover", "media"];
       if (!valid.includes(category)) return jsonResponse(400, { error: "Invalid category" });

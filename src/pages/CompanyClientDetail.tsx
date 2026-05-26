@@ -9,6 +9,10 @@ import { CREW_COLUMNS } from '@/lib/crew-columns';
 import CompanyClientSidebar, { type SectionType } from '@/components/company/CompanyClientSidebar';
 import EditClientDialog from '@/components/company/EditClientDialog';
 import ClientPortalLinkCard from '@/components/company/ClientPortalLinkCard';
+import ClientPortalDevicePreview from '@/components/company/ClientPortalDevicePreview';
+import { buildPortalUrl } from '@/lib/portalUrl';
+import DeliverablesSection from '@/components/company/DeliverablesSection';
+import ClientDashboardPage from '@/components/clientDashboard/ClientDashboardPage';
 import Money from '@/components/company/Money';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,7 +94,7 @@ export default function CompanyClientDetail() {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex fixed inset-0 z-50">
+    <div className="min-h-screen bg-[#faf8f7] text-[#1a1614] flex fixed inset-0 z-50">
       {/* Left Sidebar - Hidden on mobile */}
       {!isMobile && (
         <CompanyClientSidebar
@@ -112,51 +116,77 @@ export default function CompanyClientDetail() {
       <div className="flex-1 overflow-y-auto">
         {/* Mobile Header */}
         {isMobile && (
-          <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border p-3">
+          <div className="sticky top-0 z-50 bg-white/85 backdrop-blur-xl border-b border-[#ead9d3] p-3">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={goBack}
-                className="rounded-full"
+                className="rounded-full text-[#6b5f5c] hover:text-[#c97a6a] hover:bg-[#f5e9e4]"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <span className="text-foreground font-semibold flex-1 truncate">{client.client_name}</span>
+              <span
+                className="text-[#1a1614] font-semibold flex-1 truncate"
+                style={{ fontFamily: '"Cormorant Garamond", serif' }}
+              >
+                {client.client_name}
+              </span>
             </div>
           </div>
         )}
 
         {/* Mobile Section Tabs */}
         {isMobile && (
-          <div className="px-4 py-3 border-b border-border bg-background">
+          <div className="px-4 py-3 border-b border-[#ead9d3] bg-white/60">
             <ScrollArea className="w-full whitespace-nowrap">
               <div className="inline-flex gap-2">
-                {mobileSections.map((section) => (
-                  <Button
-                    key={section.id}
-                    variant={activeSection === section.id ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setActiveSection(section.id)}
-                    className="rounded-full text-sm"
-                  >
-                    {section.label}
-                  </Button>
-                ))}
+                {mobileSections.map((section) => {
+                  const active = activeSection === section.id;
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => setActiveSection(section.id)}
+                      className={cn(
+                        'rounded-full text-sm px-3 py-1.5 font-medium transition-colors border',
+                        active
+                          ? 'bg-gradient-to-r from-[#c97a6a] to-[#d4a574] text-white border-transparent shadow-sm'
+                          : 'text-[#6b5f5c] border-[#ead9d3] bg-white/60 hover:bg-[#f5e9e4] hover:text-[#c97a6a]'
+                      )}
+                    >
+                      {section.label}
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
           </div>
         )}
 
+
         {/* Section Content */}
-        <div className="p-4 md:p-6 animate-fade-in">
-          {activeSection === 'dashboard' && <DashboardSection client={client} />}
+        <div className={activeSection === 'dashboard' ? '' : 'p-4 md:p-6 animate-fade-in'}>
+          {activeSection === 'dashboard' && <ClientDashboardPage client={client} />}
           {activeSection === 'events' && <EventsSection clientId={client.id} clientName={client.client_name} handler={client.handler} />}
           {activeSection === 'details' && <DetailsSection client={client} />}
           {activeSection === 'notes' && <NotesSection client={client} />}
           {activeSection === 'financials' && <FinancialsSection client={client} />}
-          {activeSection === 'link' && <ClientPortalLinkCard client={client as any} />}
-          {['freelancers','registration','inquiry','sales','activity','comments','benzo','files','deliverables','edit','album'].includes(activeSection) && (
+          {activeSection === 'link' && (
+            <>
+              <ClientPortalLinkCard client={client as any} />
+              {(client as any).portal_token && (client as any).portal_enabled !== false && (
+                <ClientPortalDevicePreview
+                  url={buildPortalUrl({
+                    clientId: client.id,
+                    clientName: client.client_name,
+                    token: (client as any).portal_token,
+                  }).url}
+                />
+              )}
+            </>
+          )}
+          {activeSection === 'deliverables' && <DeliverablesSection clientId={client.id} />}
+          {['freelancers','registration','inquiry','sales','activity','comments','benzo','files','edit','album'].includes(activeSection) && (
             <ComingSoonSection label={activeSection} />
           )}
         </div>
@@ -414,11 +444,16 @@ function DashboardSection({ client }: { client: AgencyClient }) {
 /* ─── Coming Soon placeholder ─── */
 function ComingSoonSection({ label }: { label: string }) {
   return (
-    <Card className="p-12 text-center bg-slate-900/40 border-slate-700">
-      <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">{label}</div>
-      <h3 className="text-lg font-bold text-foreground mb-1">Coming soon</h3>
-      <p className="text-sm text-muted-foreground">This section is not wired up yet.</p>
-    </Card>
+    <div className="rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm p-12 text-center shadow-[0_2px_16px_rgba(180,140,130,.07)]">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-[#a39390] font-semibold mb-2">{label}</div>
+      <h3
+        className="text-xl font-semibold text-[#1a1614] mb-1"
+        style={{ fontFamily: '"Cormorant Garamond", serif' }}
+      >
+        Coming soon
+      </h3>
+      <p className="text-sm text-[#6b5f5c]">This section is not wired up yet.</p>
+    </div>
   );
 }
 
@@ -453,24 +488,33 @@ function EventsSection({ clientId, clientName, handler }: { clientId: string; cl
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between py-2 px-1 border-b border-border mb-2">
-        <h2 className="text-lg font-bold text-foreground">{clientName}</h2>
-        {handler && <Badge variant="outline" className="text-xs">Handler: {handler}</Badge>}
+      <div className="flex items-center justify-between py-2 px-1 border-b border-[#ead9d3] mb-2">
+        <h2
+          className="text-2xl font-semibold text-[#1a1614]"
+          style={{ fontFamily: '"Cormorant Garamond", serif' }}
+        >
+          {clientName}
+        </h2>
+        {handler && (
+          <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[hsl(38,70%,88%)] text-[hsl(38,70%,38%)] border border-[hsl(38,55%,78%)]">
+            Handler: {handler}
+          </span>
+        )}
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-8 text-muted-foreground">Loading event details...</div>
+        <div className="flex items-center justify-center py-8 text-[#6b5f5c]">Loading event details...</div>
       ) : events.length === 0 ? (
-        <Card className="text-center text-muted-foreground py-12 border-dashed">
-          <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+        <div className="rounded-2xl border border-dashed border-[#ead9d3] bg-white/60 text-center text-[#6b5f5c] py-12">
+          <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50 text-[#c97a6a]" />
           <p>No events configured for this client</p>
-        </Card>
+        </div>
       ) : (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/60 overflow-hidden">
-          <div className="px-4 pt-3 pb-2 text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
+        <div className="rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm overflow-hidden shadow-[0_2px_16px_rgba(180,140,130,.07)]">
+          <div className="px-4 pt-3 pb-2 text-[10px] font-semibold tracking-[0.2em] text-[#a39390] uppercase border-b border-[#f0e3dd] bg-white/40">
             Event Details
           </div>
-          <div className="divide-y divide-slate-700">
+          <div className="divide-y divide-[#f0e3dd]">
             {events.map(ev => {
               const requiredCrew = (ev.required_crew ?? '').split(',').filter(Boolean);
               const assigned = assignmentsByEvent.get(ev.id) ?? [];
@@ -479,16 +523,21 @@ function EventsSection({ clientId, clientName, handler }: { clientId: string; cl
                 <div key={ev.id} className="p-4 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   {/* Left */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-emerald-400 font-bold text-lg leading-tight">{bsLabel || 'No date'}</div>
-                    <div className="text-xs text-slate-400 uppercase tracking-wide mt-0.5">
+                    <div
+                      className="text-[#c97a6a] font-semibold text-xl leading-tight"
+                      style={{ fontFamily: '"Cormorant Garamond", serif' }}
+                    >
+                      {bsLabel || 'No date'}
+                    </div>
+                    <div className="text-[10px] text-[#a39390] uppercase tracking-[0.18em] font-semibold mt-0.5">
                       {ev.event_name || 'Event'}
                     </div>
                     {ev.event_date_ad && (
-                      <div className="text-[11px] text-slate-500 mt-1">AD: {ev.event_date_ad}</div>
+                      <div className="text-[11px] text-[#a39390] mt-1">AD: {ev.event_date_ad}</div>
                     )}
                     {requiredCrew.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        <span className="text-[11px] text-slate-400 mr-1 self-center">Required:</span>
+                        <span className="text-[11px] text-[#6b5f5c] mr-1 self-center">Required:</span>
                         {requiredCrew.map(key => {
                           const col = CREW_COLUMNS.find(c => c.key === key);
                           if (!col) return null;
@@ -504,9 +553,9 @@ function EventsSection({ clientId, clientName, handler }: { clientId: string; cl
 
                   {/* Right: assigned crew */}
                   <div className="md:w-64 shrink-0">
-                    <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5 md:text-right">Assigned Crew</div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-[#a39390] font-semibold mb-1.5 md:text-right">Assigned Crew</div>
                     {assigned.length === 0 ? (
-                      <div className="text-sm text-slate-500 italic md:text-right">No crew assigned</div>
+                      <div className="text-sm text-[#a39390] italic md:text-right">No crew assigned</div>
                     ) : (
                       <div className="flex flex-col gap-1.5 md:items-end">
                         {assigned.map((a, i) => {
@@ -517,7 +566,7 @@ function EventsSection({ clientId, clientName, handler }: { clientId: string; cl
                               <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-bold', roleBadgeClass(code))}>
                                 {code}
                               </span>
-                              <span className="text-sm text-slate-200">{a.name}</span>
+                              <span className="text-sm text-[#1a1614] font-medium">{a.name}</span>
                             </div>
                           );
                         })}
@@ -549,32 +598,42 @@ function formatBsLabel(bs: string | null): string {
 
 function roleBadgeClass(code: string): string {
   const c = code.toUpperCase();
-  if (c === 'PG' || c === 'PB') return 'bg-purple-500/20 text-purple-300 border border-purple-500/40';
-  if (c === 'VB' || c === 'VG') return 'bg-violet-500/20 text-violet-300 border border-violet-500/40';
-  if (c === 'EP') return 'bg-rose-500/20 text-rose-300 border border-rose-500/40';
-  if (c === 'EV') return 'bg-blue-500/20 text-blue-300 border border-blue-500/40';
-  if (c.startsWith('DRONE') || c === 'FPV') return 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
-  return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+  if (c === 'PG' || c === 'PB') return 'bg-[hsl(280,55%,92%)] text-[hsl(280,55%,38%)] border border-[hsl(280,45%,82%)]';
+  if (c === 'VB' || c === 'VG') return 'bg-[hsl(260,55%,93%)] text-[hsl(260,50%,42%)] border border-[hsl(260,45%,84%)]';
+  if (c === 'EP') return 'bg-[hsl(350,60%,92%)] text-[hsl(350,55%,42%)] border border-[hsl(350,55%,82%)]';
+  if (c === 'EV') return 'bg-[hsl(210,60%,92%)] text-[hsl(210,55%,38%)] border border-[hsl(210,50%,82%)]';
+  if (c.startsWith('DRONE') || c === 'FPV') return 'bg-[hsl(195,60%,92%)] text-[hsl(195,55%,34%)] border border-[hsl(195,50%,80%)]';
+  return 'bg-[hsl(140,50%,92%)] text-[hsl(140,45%,32%)] border border-[hsl(140,40%,80%)]';
 }
 
 /* ─── Client Details ─── */
 function DetailsSection({ client }: { client: AgencyClient }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-foreground mb-4">Client Details</h2>
-      <Card className="overflow-hidden">
+      <h2
+        className="text-2xl font-semibold text-[#1a1614] mb-4"
+        style={{ fontFamily: '"Cormorant Garamond", serif' }}
+      >
+        Client Details
+      </h2>
+      <div className="rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm overflow-hidden shadow-[0_2px_16px_rgba(180,140,130,.07)]">
         <div className="p-5">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 shadow-md">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#c97a6a] to-[#d4a574] shadow-[0_3px_14px_hsl(350,80%,65%,.26)]">
               <User className="h-6 w-6 text-white" />
             </div>
             <div>
-              <div className="font-bold text-lg text-foreground">Client Details</div>
-              <div className="text-sm text-muted-foreground">Contact & location information</div>
+              <div
+                className="font-semibold text-lg text-[#1a1614]"
+                style={{ fontFamily: '"Cormorant Garamond", serif' }}
+              >
+                Client Details
+              </div>
+              <div className="text-sm text-[#6b5f5c]">Contact & location information</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <DetailField icon={Phone} label="Contact Number" value={client.contact_number} />
             <DetailField icon={MessageCircle} label="WhatsApp" value={client.whatsapp_number} />
             <DetailField icon={Mail} label="Email" value={client.email} />
@@ -587,7 +646,7 @@ function DetailsSection({ client }: { client: AgencyClient }) {
             <DetailField icon={MapPin} label="To City" value={client.event_to_city} />
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -596,21 +655,26 @@ function DetailsSection({ client }: { client: AgencyClient }) {
 function NotesSection({ client }: { client: AgencyClient }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-foreground mb-4">Notes</h2>
+      <h2
+        className="text-2xl font-semibold text-[#1a1614] mb-4"
+        style={{ fontFamily: '"Cormorant Garamond", serif' }}
+      >
+        Notes
+      </h2>
 
-      <Card className="p-4">
-        <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Description</div>
-        <div className="text-sm text-foreground whitespace-pre-wrap">
-          {client.description || <span className="text-muted-foreground italic">No description</span>}
+      <div className="rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm p-4 shadow-[0_2px_16px_rgba(180,140,130,.07)]">
+        <div className="text-[10px] text-[#a39390] mb-2 uppercase tracking-[0.2em] font-semibold">Description</div>
+        <div className="text-sm text-[#1a1614] whitespace-pre-wrap">
+          {client.description || <span className="text-[#a39390] italic">No description</span>}
         </div>
-      </Card>
+      </div>
 
-      <Card className="p-4">
-        <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Notes</div>
-        <div className="text-sm text-foreground whitespace-pre-wrap">
-          {client.notes || <span className="text-muted-foreground italic">No notes</span>}
+      <div className="rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm p-4 shadow-[0_2px_16px_rgba(180,140,130,.07)]">
+        <div className="text-[10px] text-[#a39390] mb-2 uppercase tracking-[0.2em] font-semibold">Notes</div>
+        <div className="text-sm text-[#1a1614] whitespace-pre-wrap">
+          {client.notes || <span className="text-[#a39390] italic">No notes</span>}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -622,43 +686,63 @@ function FinancialsSection({ client }: { client: AgencyClient }) {
     ? Math.round((client.advance_amount / client.package_amount) * 100)
     : 0;
 
+  const statCard = "rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm p-6 text-center shadow-[0_2px_16px_rgba(180,140,130,.07)]";
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-foreground mb-4">Financials</h2>
+      <h2
+        className="text-2xl font-semibold text-[#1a1614] mb-4"
+        style={{ fontFamily: '"Cormorant Garamond", serif' }}
+      >
+        Financials
+      </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-6 text-center">
-          <DollarSign className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-          <div className="text-xs text-muted-foreground mb-1">Package Amount</div>
-          <div className="text-2xl font-bold text-foreground"><Money amount={client.package_amount} /></div>
-        </Card>
-        <Card className="p-6 text-center">
-          <DollarSign className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
-          <div className="text-xs text-muted-foreground mb-1">Advance Paid</div>
-          <div className="text-2xl font-bold text-emerald-600"><Money amount={client.advance_amount} /></div>
-        </Card>
-        <Card className="p-6 text-center">
-          <DollarSign className={cn('w-8 h-8 mx-auto mb-2', remaining > 0 ? 'text-red-600' : 'text-emerald-600')} />
-          <div className="text-xs text-muted-foreground mb-1">Remaining</div>
-          <div className={cn('text-2xl font-bold', remaining > 0 ? 'text-red-600' : 'text-emerald-600')}>
+        <div className={statCard}>
+          <DollarSign className="w-8 h-8 mx-auto text-[#a39390] mb-2" />
+          <div className="text-[10px] text-[#a39390] uppercase tracking-[0.2em] font-semibold mb-1">Package Amount</div>
+          <div
+            className="text-3xl font-semibold text-[#1a1614]"
+            style={{ fontFamily: '"Cormorant Garamond", serif' }}
+          >
+            <Money amount={client.package_amount} />
+          </div>
+        </div>
+        <div className={statCard}>
+          <DollarSign className="w-8 h-8 mx-auto text-[hsl(140,55%,42%)] mb-2" />
+          <div className="text-[10px] text-[#a39390] uppercase tracking-[0.2em] font-semibold mb-1">Advance Paid</div>
+          <div
+            className="text-3xl font-semibold text-[hsl(140,55%,38%)]"
+            style={{ fontFamily: '"Cormorant Garamond", serif' }}
+          >
+            <Money amount={client.advance_amount} />
+          </div>
+        </div>
+        <div className={statCard}>
+          <DollarSign className={cn('w-8 h-8 mx-auto mb-2', remaining > 0 ? 'text-[#c97a6a]' : 'text-[hsl(140,55%,42%)]')} />
+          <div className="text-[10px] text-[#a39390] uppercase tracking-[0.2em] font-semibold mb-1">Remaining</div>
+          <div
+            className={cn('text-3xl font-semibold', remaining > 0 ? 'text-[#c97a6a]' : 'text-[hsl(140,55%,38%)]')}
+            style={{ fontFamily: '"Cormorant Garamond", serif' }}
+          >
             <Money amount={remaining} />
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Progress bar */}
-      <Card className="p-4">
+      <div className="rounded-2xl border border-[#ead9d3] bg-white/70 backdrop-blur-sm p-4 shadow-[0_2px_16px_rgba(180,140,130,.07)]">
         <div className="flex items-center justify-between text-sm mb-2">
-          <span className="text-muted-foreground">Payment Progress</span>
-          <span className="text-foreground font-semibold">{paidPercentage}%</span>
+          <span className="text-[#6b5f5c]">Payment Progress</span>
+          <span className="text-[#1a1614] font-semibold">{paidPercentage}%</span>
         </div>
-        <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+        <div className="w-full h-3 bg-[#f5e9e4] rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-[#c97a6a] to-[#d4a574] rounded-full transition-all duration-500"
             style={{ width: `${paidPercentage}%` }}
           />
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -667,12 +751,12 @@ function FinancialsSection({ client }: { client: AgencyClient }) {
 function DetailField({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null | undefined }) {
   if (!value) return null;
   return (
-    <div className="p-3 rounded-lg bg-muted/50 border border-border">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-        <Icon className="h-3.5 w-3.5" />
+    <div className="p-3 rounded-xl bg-white/60 border border-[#f0e3dd]">
+      <div className="flex items-center gap-2 text-[10px] text-[#a39390] uppercase tracking-[0.18em] font-semibold mb-1">
+        <Icon className="h-3.5 w-3.5 text-[#c97a6a]" />
         {label}
       </div>
-      <div className="text-sm text-foreground font-medium">{value}</div>
+      <div className="text-sm text-[#1a1614] font-medium">{value}</div>
     </div>
   );
 }

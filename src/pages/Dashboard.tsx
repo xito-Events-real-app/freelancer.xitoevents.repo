@@ -729,11 +729,11 @@ export default function Dashboard() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <div className="max-w-lg lg:max-w-3xl mx-auto px-4 py-6">
+    <div className="min-h-screen bg-background pb-6">
+      <div className="max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <LaganStickyWidget />
-        <div className="flex items-center justify-between mb-4 mt-3">
-          <h1 className="text-2xl font-bold">Home</h1>
+        <div className="flex items-center justify-between mb-4 mt-2 sm:mt-3">
+          <h1 className="text-xl sm:text-2xl font-bold">Home</h1>
           <FeedNotificationBell />
         </div>
 

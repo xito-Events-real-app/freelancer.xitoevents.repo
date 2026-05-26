@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFreelancerById } from '@/hooks/useProfile';
 import { maskName } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
 import ProfileLayout from '@/components/ProfileLayout';
 
 export default function FreelancerDetail() {
@@ -31,16 +31,42 @@ export default function FreelancerDetail() {
     );
   }
 
-  // If viewing own profile via freelancer link, redirect concept handled by same layout
   const rawName = (profile.account_type === 'agency' && profile.business_name) ? profile.business_name : profile.full_name;
   const displayName = isGuest ? maskName(rawName) : rawName;
+  const skill = (profile as any).primary_skill || (profile as any).skill || 'Wedding Creative';
+  const city = (profile as any).city || 'Nepal';
+  const url = `https://photography.xitoevents.com/freelancer/${id}`;
+  const title = `${displayName} — ${skill} in ${city} | Xito`;
+  const description = `View ${displayName}'s portfolio on Xito. ${skill} based in ${city}. Browse work, check availability and get in touch.`;
 
   return (
-    <ProfileLayout
-      profile={profile}
-      isOwnProfile={isOwnProfile}
-      isGuest={isGuest}
-      displayName={displayName}
-    />
+    <>
+      <Helmet>
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <link rel="canonical" href={url} />
+        <meta property="og:type" content="profile" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content={url} />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "ProfilePage",
+          "url": url,
+          "mainEntity": {
+            "@type": "Person",
+            "name": displayName,
+            "jobTitle": skill,
+            "address": { "@type": "PostalAddress", "addressLocality": city, "addressCountry": "NP" }
+          }
+        })}</script>
+      </Helmet>
+      <ProfileLayout
+        profile={profile}
+        isOwnProfile={isOwnProfile}
+        isGuest={isGuest}
+        displayName={displayName}
+      />
+    </>
   );
 }

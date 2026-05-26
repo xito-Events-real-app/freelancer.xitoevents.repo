@@ -39,11 +39,13 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'init':
+      if (action.id === state.activeAgencyId && !state.switching) return state;
       return { activeAgencyId: action.id, switching: false };
     case 'switch':
       if (action.id === state.activeAgencyId) return state;
       return { activeAgencyId: action.id, switching: true };
     case 'ready':
+      if (!state.switching) return state;
       return { ...state, switching: false };
   }
 }

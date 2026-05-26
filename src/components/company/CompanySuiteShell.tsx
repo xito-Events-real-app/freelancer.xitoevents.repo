@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  Video,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -42,6 +44,8 @@ const modules: ModuleDef[] = [
   { path: '/company/booked',         icon: CalendarCheck, label: 'Booked Clients',   gradient: 'from-green-500 to-emerald-600', section: 'booked' },
   { path: '/company/finance',        icon: DollarSign,    label: 'Finance Manager',  gradient: 'from-emerald-500 to-green-600', section: 'finance' },
   { path: '/company/files',          icon: FolderOpen,    label: 'File Management',  gradient: 'from-amber-500 to-orange-600', subtitle: 'Storage & Backups', section: 'file_management' },
+  { path: '/company/video-edit',     icon: Video,         label: 'Video Edit Tracker', gradient: 'from-purple-500 to-fuchsia-600', subtitle: '7-stage pipeline', section: 'all_clients' },
+  { path: '/company/photo-edit',     icon: ImageIcon,     label: 'Photo Edit Tracker', gradient: 'from-rose-500 to-pink-600', subtitle: '7-stage pipeline', section: 'all_clients' },
   { path: '/company/settings',       icon: Settings,      label: 'Settings',         gradient: 'from-slate-500 to-slate-600', section: 'settings' },
 ];
 

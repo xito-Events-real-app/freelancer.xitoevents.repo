@@ -1,9 +1,15 @@
 import type { ProfileFormType } from '@/components/portal/ProfileFormOverlay';
+import CouplePhotoHeader from '@/components/portal/CouplePhotoHeader';
+import type { PortalContext } from '@/lib/portalClient';
 
 interface Props {
   data: any;
+  ctx: PortalContext;
   onOpen: (type: ProfileFormType) => void;
+  onOpenFamily: () => void;
+  onRefetch: () => void;
 }
+
 
 const PERSON_FIELDS = [
   'full_name', 'instagram', 'contact_number', 'whatsapp_number',
@@ -19,7 +25,7 @@ function progress(contact: any, prefix: 'bride' | 'groom') {
   return `${filled}/${PERSON_FIELDS.length}`;
 }
 
-export default function PortalMyDetails({ data, onOpen }: Props) {
+export default function PortalMyDetails({ data, ctx, onOpen, onOpenFamily, onRefetch }: Props) {
   const contact = data.contact || {};
   // Do NOT fall back to client_name — show explicit empty state instead.
   const brideName = (contact.bride_full_name || '').trim() || 'Not added yet';
@@ -30,13 +36,16 @@ export default function PortalMyDetails({ data, onOpen }: Props) {
 
   return (
     <>
-      <div style={{ textAlign: 'center', padding: '32px 24px 20px' }}>
+      <CouplePhotoHeader ctx={ctx} data={data} onSaved={onRefetch} />
+
+      <div style={{ textAlign: 'center', padding: '12px 24px 20px' }}>
         <div style={{ fontSize: 22, color: 'var(--rose)', marginBottom: 8 }}>♡</div>
         <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--cp-text)' }}>My Profile</div>
         <div style={{ fontSize: 11, color: 'var(--cp-text-3)', marginTop: 3 }}>
           Manage your contact &amp; location details
         </div>
       </div>
+
 
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <button
@@ -72,6 +81,24 @@ export default function PortalMyDetails({ data, onOpen }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <span className="cp-prof-progress" style={{ color: 'hsl(210,80%,45%)' }}>{progress(contact, 'groom')}</span>
             <span style={{ fontSize: 18, color: groomFilled ? '#22c55e' : '#cbd5e1' }}>✅</span>
+          </div>
+        </button>
+
+        <button
+          className="cp-prof-card"
+          onClick={onOpenFamily}
+          style={{ background: 'linear-gradient(135deg, hsl(38,80%,97%) 0%, hsl(38,60%,92%) 100%)' }}
+        >
+          <div className="cp-prof-card-icon" style={{ background: 'linear-gradient(135deg, hsl(38,80%,55%), hsl(20,75%,55%))' }}>👨‍👩‍👧</div>
+          <div className="cp-prof-card-body">
+            <div className="cp-prof-card-title">Core Family Members</div>
+            <div className="cp-prof-card-sub">Help photographers recognise key family — never miss a portrait</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <span className="cp-prof-progress" style={{ color: 'hsl(20,70%,40%)' }}>
+              {(Array.isArray(data.family_members) ? data.family_members.length : 0)}/20
+            </span>
+            <span style={{ fontSize: 18, color: (data.family_members?.length ? '#22c55e' : '#cbd5e1') }}>✅</span>
           </div>
         </button>
 

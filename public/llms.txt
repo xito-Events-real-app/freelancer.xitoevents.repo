@@ -1,0 +1,14 @@
+# Xito Freelancer
+
+> Portfolio, discovery, and booking platform for wedding photographers, videographers and event creatives in Nepal.
+
+Xito Freelancer lets wedding creatives in Nepal showcase their work, get discovered by couples and agencies, and manage bookings, clients and crew from one app.
+
+## Pages
+
+- [Home](/): Personalized feed of wedding creatives, posts and shoots.
+- [Discover](/discover): Browse photographers, videographers and other wedding freelancers across Nepal.
+- [Market](/market): Community marketplace for gigs, gear and collaborations.
+- [Xito Events](/xito-events): Featured weddings and event showcases.
+- [Lagan](/lagan): Auspicious Nepali wedding dates (Lagan calendar).
+- [Sign in](/auth): Sign in or create a Xito Freelancer account.

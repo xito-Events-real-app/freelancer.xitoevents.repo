@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_client_activity_log: {
+        Row: {
+          action_text: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action_text: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action_text?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_client_activity_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "agency_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_client_events: {
         Row: {
           client_id: string
@@ -46,6 +81,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      agency_client_family_members: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          pending: boolean
+          photo_url: string | null
+          role: string
+          side: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          pending?: boolean
+          photo_url?: string | null
+          role: string
+          side: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          pending?: boolean
+          photo_url?: string | null
+          role?: string
+          side?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_client_family_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "agency_clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agency_client_payments: {
         Row: {
@@ -111,7 +196,9 @@ export type Database = {
         Row: {
           advance_amount: number
           client_name: string
+          client_slug: string | null
           contact_number: string | null
+          couple_photo_url: string | null
           created_at: string
           description: string | null
           email: string | null
@@ -129,6 +216,8 @@ export type Database = {
           package_amount: number
           portal_enabled: boolean
           portal_token: string | null
+          profile_photo_url: string | null
+          rating: number | null
           source: string | null
           status: string
           updated_at: string
@@ -138,7 +227,9 @@ export type Database = {
         Insert: {
           advance_amount?: number
           client_name: string
+          client_slug?: string | null
           contact_number?: string | null
+          couple_photo_url?: string | null
           created_at?: string
           description?: string | null
           email?: string | null
@@ -156,6 +247,8 @@ export type Database = {
           package_amount?: number
           portal_enabled?: boolean
           portal_token?: string | null
+          profile_photo_url?: string | null
+          rating?: number | null
           source?: string | null
           status?: string
           updated_at?: string
@@ -165,7 +258,9 @@ export type Database = {
         Update: {
           advance_amount?: number
           client_name?: string
+          client_slug?: string | null
           contact_number?: string | null
+          couple_photo_url?: string | null
           created_at?: string
           description?: string | null
           email?: string | null
@@ -183,6 +278,8 @@ export type Database = {
           package_amount?: number
           portal_enabled?: boolean
           portal_token?: string | null
+          profile_photo_url?: string | null
+          rating?: number | null
           source?: string | null
           status?: string
           updated_at?: string
@@ -271,6 +368,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      agency_reference_share_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          token?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_reference_share_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "agency_clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agency_settings: {
         Row: {
@@ -438,6 +573,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      album_types: {
+        Row: {
+          created_at: string
+          id: string
+          type_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          type_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          type_name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       booking_details: {
         Row: {
@@ -796,6 +952,7 @@ export type Database = {
           id: string
           item_names: string | null
           photographer_notes: string | null
+          photographer_toggles: string
           quantity: number
           section: string
           updated_at: string
@@ -810,6 +967,7 @@ export type Database = {
           id?: string
           item_names?: string | null
           photographer_notes?: string | null
+          photographer_toggles?: string
           quantity?: number
           section: string
           updated_at?: string
@@ -824,6 +982,7 @@ export type Database = {
           id?: string
           item_names?: string | null
           photographer_notes?: string | null
+          photographer_toggles?: string
           quantity?: number
           section?: string
           updated_at?: string
@@ -978,6 +1137,7 @@ export type Database = {
           entry_type: string
           event_name: string | null
           id: string
+          image_url: string | null
           link_title: string | null
           link_url: string | null
           platform: string | null
@@ -989,6 +1149,7 @@ export type Database = {
           entry_type?: string
           event_name?: string | null
           id?: string
+          image_url?: string | null
           link_title?: string | null
           link_url?: string | null
           platform?: string | null
@@ -1000,6 +1161,7 @@ export type Database = {
           entry_type?: string
           event_name?: string | null
           id?: string
+          image_url?: string | null
           link_title?: string | null
           link_url?: string | null
           platform?: string | null
@@ -1548,6 +1710,7 @@ export type Database = {
       freelancer_profiles: {
         Row: {
           account_type: string
+          agency_slug: string | null
           area: string | null
           available_for_travel: boolean | null
           bank_account_holder: string | null
@@ -1599,6 +1762,7 @@ export type Database = {
         }
         Insert: {
           account_type?: string
+          agency_slug?: string | null
           area?: string | null
           available_for_travel?: boolean | null
           bank_account_holder?: string | null
@@ -1650,6 +1814,7 @@ export type Database = {
         }
         Update: {
           account_type?: string
+          agency_slug?: string | null
           area?: string | null
           available_for_travel?: boolean | null
           bank_account_holder?: string | null
@@ -2037,6 +2202,78 @@ export type Database = {
         }
         Relationships: []
       }
+      photo_edit_tracker: {
+        Row: {
+          client_demand: string
+          client_id: string
+          company_notes: string
+          created_at: string
+          deadline: string | null
+          deleted: boolean
+          edit_started_at: string | null
+          edit_type: string
+          editor: string
+          event_name: string
+          id: string
+          is_playing: boolean
+          photo_edit_status: string
+          photographer_name: string
+          photographer_role: string
+          photographer_side: string
+          playing_since: string | null
+          reference: string
+          stage_history: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          client_demand?: string
+          client_id: string
+          company_notes?: string
+          created_at?: string
+          deadline?: string | null
+          deleted?: boolean
+          edit_started_at?: string | null
+          edit_type?: string
+          editor?: string
+          event_name?: string
+          id?: string
+          is_playing?: boolean
+          photo_edit_status?: string
+          photographer_name?: string
+          photographer_role?: string
+          photographer_side?: string
+          playing_since?: string | null
+          reference?: string
+          stage_history?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Update: {
+          client_demand?: string
+          client_id?: string
+          company_notes?: string
+          created_at?: string
+          deadline?: string | null
+          deleted?: boolean
+          edit_started_at?: string | null
+          edit_type?: string
+          editor?: string
+          event_name?: string
+          id?: string
+          is_playing?: boolean
+          photo_edit_status?: string
+          photographer_name?: string
+          photographer_role?: string
+          photographer_side?: string
+          playing_since?: string | null
+          reference?: string
+          stage_history?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: []
+      }
       portal_hidden_videos: {
         Row: {
           client_id: string
@@ -2273,6 +2510,84 @@ export type Database = {
         }
         Relationships: []
       }
+      video_edit_tracker: {
+        Row: {
+          client_demand: string
+          client_id: string
+          colorist: string
+          company_notes: string
+          created_at: string
+          deadline: string | null
+          deleted: boolean
+          edit_started_at: string | null
+          edit_type: string
+          editor: string
+          event_name: string
+          force_split: boolean
+          id: string
+          is_playing: boolean
+          playing_since: string | null
+          reference: string
+          songs: string
+          stage_history: string
+          sub_event_name: string
+          updated_at: string
+          urgency: string
+          video_edit_status: string
+          youtube_link: string
+        }
+        Insert: {
+          client_demand?: string
+          client_id: string
+          colorist?: string
+          company_notes?: string
+          created_at?: string
+          deadline?: string | null
+          deleted?: boolean
+          edit_started_at?: string | null
+          edit_type?: string
+          editor?: string
+          event_name?: string
+          force_split?: boolean
+          id?: string
+          is_playing?: boolean
+          playing_since?: string | null
+          reference?: string
+          songs?: string
+          stage_history?: string
+          sub_event_name?: string
+          updated_at?: string
+          urgency?: string
+          video_edit_status?: string
+          youtube_link?: string
+        }
+        Update: {
+          client_demand?: string
+          client_id?: string
+          colorist?: string
+          company_notes?: string
+          created_at?: string
+          deadline?: string | null
+          deleted?: boolean
+          edit_started_at?: string | null
+          edit_type?: string
+          editor?: string
+          event_name?: string
+          force_split?: boolean
+          id?: string
+          is_playing?: boolean
+          playing_since?: string | null
+          reference?: string
+          songs?: string
+          stage_history?: string
+          sub_event_name?: string
+          updated_at?: string
+          urgency?: string
+          video_edit_status?: string
+          youtube_link?: string
+        }
+        Relationships: []
+      }
       xito_venue_photos: {
         Row: {
           id: string
@@ -2479,6 +2794,7 @@ export type Database = {
       }
     }
     Functions: {
+      _slugify: { Args: { p_in: string }; Returns: string }
       add_agency_finance_bank:
         | {
             Args: {
@@ -2580,6 +2896,16 @@ export type Database = {
       }
       is_suspended: { Args: { _user_id: string }; Returns: boolean }
       link_orphan_profile_to_current_user: { Args: never; Returns: Json }
+      portal_add_family_member: {
+        Args: {
+          p_client: string
+          p_name: string
+          p_role: string
+          p_side: string
+          p_token: string
+        }
+        Returns: string
+      }
       portal_add_reference: {
         Args: { p_client: string; p_data: Json; p_token: string }
         Returns: {
@@ -2589,6 +2915,7 @@ export type Database = {
           entry_type: string
           event_name: string | null
           id: string
+          image_url: string | null
           link_title: string | null
           link_url: string | null
           platform: string | null
@@ -2610,9 +2937,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      portal_create_reference_photo: {
+        Args: { p_client: string; p_event_name: string; p_token: string }
+        Returns: string
+      }
+      portal_delete_family_member: {
+        Args: { p_client: string; p_member_id: string; p_token: string }
+        Returns: string
+      }
       portal_delete_reference: {
         Args: { p_client: string; p_ref_id: string; p_token: string }
-        Returns: undefined
+        Returns: string
       }
       portal_hide_video: {
         Args: { p_client: string; p_token: string; p_video_id: string }
@@ -2655,8 +2990,30 @@ export type Database = {
         }
         Returns: undefined
       }
+      portal_set_couple_photo: {
+        Args: { p_client: string; p_token: string; p_url: string }
+        Returns: undefined
+      }
       portal_set_enabled: {
         Args: { p_client: string; p_enabled: boolean }
+        Returns: undefined
+      }
+      portal_set_family_member_photo: {
+        Args: {
+          p_client: string
+          p_member_id: string
+          p_token: string
+          p_url: string
+        }
+        Returns: undefined
+      }
+      portal_set_reference_image: {
+        Args: {
+          p_client: string
+          p_ref_id: string
+          p_token: string
+          p_url: string
+        }
         Returns: undefined
       }
       portal_submit_album: {
@@ -2691,6 +3048,17 @@ export type Database = {
       }
       portal_unhide_video: {
         Args: { p_client: string; p_token: string; p_video_id: string }
+        Returns: undefined
+      }
+      portal_update_family_member: {
+        Args: {
+          p_client: string
+          p_member_id: string
+          p_name: string
+          p_role: string
+          p_side: string
+          p_token: string
+        }
         Returns: undefined
       }
       portal_upsert_contact: {
@@ -2782,6 +3150,14 @@ export type Database = {
       portal_verify: {
         Args: { _client: string; _token: string }
         Returns: boolean
+      }
+      portal_verify_token: {
+        Args: { p_client: string; p_token: string }
+        Returns: {
+          agency_slug: string
+          client_id: string
+          user_id: string
+        }[]
       }
       revoke_finance_access: { Args: { _staff: string }; Returns: Json }
       set_active_agency: { Args: { _agency: string }; Returns: undefined }

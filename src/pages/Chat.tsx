@@ -23,14 +23,14 @@ export default function Chat() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border px-4 py-3">
-        <div className="max-w-lg lg:max-w-3xl mx-auto flex items-center gap-3">
-          <h1 className="font-bold text-foreground text-lg">Messages</h1>
+    <div className="min-h-screen bg-background pb-6">
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border px-4 sm:px-6 py-3">
+        <div className="max-w-xl lg:max-w-2xl mx-auto flex items-center gap-3">
+          <h1 className="font-bold text-foreground text-lg sm:text-xl">Messages</h1>
         </div>
       </div>
 
-      <div className="max-w-lg lg:max-w-3xl mx-auto">
+      <div className="max-w-xl lg:max-w-2xl mx-auto">
         {/* Pinned Group Chat */}
         <button
           onClick={() => navigate('/chat/group/wedding')}

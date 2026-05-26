@@ -10,6 +10,7 @@ import PortalAlbum from '@/components/portal/tabs/PortalAlbum';
 import PortalVideos from '@/components/portal/tabs/PortalVideos';
 import EventDetailsOverlay from '@/components/portal/EventDetailsOverlay';
 import ProfileFormOverlay, { type ProfileFormType } from '@/components/portal/ProfileFormOverlay';
+import FamilyMembersOverlay from '@/components/portal/FamilyMembersOverlay';
 import '@/styles/client-portal.css';
 
 export type Tab = 'dashboard' | 'references' | 'photos' | 'album' | 'videos' | 'details';
@@ -31,6 +32,7 @@ export default function ClientPortal() {
   const [evdOpen, setEvdOpen] = useState(false);
   const [evdEventId, setEvdEventId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState<ProfileFormType | null>(null);
+  const [familyOpen, setFamilyOpen] = useState(false);
 
   const ctx = useMemo(() => ({ clientId, token }), [clientId, token]);
 
@@ -77,7 +79,7 @@ export default function ClientPortal() {
       {tab === 'photos' && <PortalPhotos data={data} ctx={ctx} onChange={refetch} />}
       {tab === 'album' && <PortalAlbum data={data} ctx={ctx} onChange={refetch} />}
       {tab === 'videos' && <PortalVideos data={data} ctx={ctx} onChange={refetch} />}
-      {tab === 'details' && <PortalMyDetails data={data} onOpen={setProfileOpen} />}
+      {tab === 'details' && <PortalMyDetails data={data} ctx={ctx} onOpen={setProfileOpen} onOpenFamily={() => setFamilyOpen(true)} onRefetch={refetch} />}
 
       <nav className="cp-bnav">
         {TABS.map((t) => (
@@ -111,6 +113,15 @@ export default function ClientPortal() {
         ctx={ctx}
         onSaved={refetch}
       />
+
+      <FamilyMembersOverlay
+        open={familyOpen}
+        onClose={() => setFamilyOpen(false)}
+        data={data}
+        ctx={ctx}
+        onSaved={refetch}
+      />
+
     </div>
   );
 }

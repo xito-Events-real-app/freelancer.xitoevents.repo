@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Plus, Trash2, CalendarDays, List, Calendar, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { Helmet } from 'react-helmet-async';
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -348,18 +349,27 @@ export default function Index() {
   // Guest: show calendar read-only (no early return)
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-violet-950 to-slate-900 text-white flex flex-col pb-16 max-w-md mx-auto">
-      {/* Compact Header */}
-      <div className="px-4 pt-4 pb-2 space-y-1.5 flex-shrink-0">
+    <>
+    <Helmet>
+      <title>Xito — Bookings & Calendar for Wedding Creatives in Nepal</title>
+      <meta name="description" content="Plan your wedding season at a glance. Track bookings, Lagan dates and clients with Xito — built for Nepal's wedding photographers and videographers." />
+      <link rel="canonical" href="https://photography.xitoevents.com/" />
+      <meta property="og:title" content="Xito — Bookings & Calendar for Wedding Creatives in Nepal" />
+      <meta property="og:description" content="Plan your wedding season at a glance. Track bookings, Lagan dates and clients with Xito." />
+      <meta property="og:url" content="https://photography.xitoevents.com/" />
+    </Helmet>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-violet-950 to-slate-900 text-white flex flex-col">
+      {/* Header */}
+      <div className="px-4 sm:px-6 pt-4 pb-2 space-y-1.5 flex-shrink-0 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between">
-          <p className="text-xs text-violet-200 truncate">
+          <p className="text-xs sm:text-sm text-violet-200 truncate">
             {getGreeting()}, <span className="font-semibold text-white">{firstName}</span>
           </p>
           <span className="text-[10px] bg-white/10 text-violet-300 px-2 py-0.5 rounded-full whitespace-nowrap ml-2">
             {currentBS.day} {bsMonth} {currentBS.year} / {adFormatted}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">
             {stats.totalThisMonth} This Month
           </span>
@@ -372,8 +382,8 @@ export default function Index() {
         </div>
       </div>
 
-      {/* Tab Bar */}
-      <div className="flex-shrink-0 px-4 pb-2 flex gap-2">
+      {/* Tab Bar — mobile only */}
+      <div className="flex-shrink-0 px-4 pb-2 flex gap-2 md:hidden">
         <button
           onClick={() => setActiveTab("calendar")}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all
@@ -392,8 +402,10 @@ export default function Index() {
         </button>
       </div>
 
-      {/* Scrollable Tab Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      {/* Content — mobile: single scrollable column | md+: two-column grid */}
+      <div className="flex-1 overflow-y-auto md:overflow-visible">
+        {/* Mobile layout */}
+        <div className="md:hidden px-4 pb-4">
         {activeTab === "calendar" ? (
           <div className="space-y-4">
             {/* Calendar Navigation */}
@@ -575,10 +587,129 @@ export default function Index() {
             )}
           </div>
         )}
+        </div>
+        {/* Desktop two-column layout (md+) */}
+        <div className="hidden md:grid md:grid-cols-[1fr_360px] lg:grid-cols-[1fr_400px] gap-6 px-6 pb-6 max-w-5xl mx-auto">
+          {/* Left column: Calendar */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <button onClick={handlePrevMonth} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+              <p className="text-lg font-bold">{monthName} {navYear}</p>
+              <button onClick={handleNextMonth} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"><ChevronRight className="w-5 h-5" /></button>
+            </div>
+            {laganDaysSet.size > 0 && (
+              <div className="flex items-center gap-1 flex-wrap bg-orange-500/10 border border-orange-400/30 rounded-lg px-2 py-1.5">
+                <GaneshIcon className="w-3.5 h-3.5 text-orange-300 shrink-0" />
+                <span className="text-[10px] font-bold text-orange-300 mr-0.5">Lagan:</span>
+                {Array.from(laganDaysSet).sort((a, b) => a - b).map(d => (
+                  <span key={d} className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-orange-400/80 text-white">{d}</span>
+                ))}
+              </div>
+            )}
+            <div className="bg-white/5 backdrop-blur rounded-2xl p-4">
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {WEEKDAYS.map(d => <div key={d} className="text-center text-[10px] font-semibold text-violet-400 py-1">{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {Array.from({ length: firstDayWeekday }).map((_, i) => <div key={`e-${i}`} className="aspect-square" />)}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const dayBookings = bookedDaysMap.get(day);
+                  const isBooked = !!dayBookings && dayBookings.length > 0;
+                  const isToday = navYear === currentBS.year && navMonth === currentBS.month && day === currentBS.day;
+                  const isSelected = selectedDay === day;
+                  const isPast = isDayPast(day);
+                  const isLagan = laganDaysSet.has(day);
+                  const stateClasses = isToday
+                    ? "bg-rose-500 text-white font-bold ring-2 ring-rose-300 shadow-[0_0_14px_rgba(251,113,133,0.6)]"
+                    : isBooked ? isSelected ? "bg-emerald-500 text-white ring-2 ring-emerald-300 scale-105" : isPast ? "bg-emerald-500/15 text-emerald-400/50" : "bg-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50"
+                    : isSelected ? "bg-white/20 text-white ring-1 ring-white/30" : isPast ? "text-gray-400" : "text-emerald-300/80 hover:bg-white/10";
+                  const laganOverlay = isLagan && !isToday ? isPast ? " ring-2 ring-orange-400/40" : " ring-2 ring-orange-300 animate-lagan-pulse" : "";
+                  return (
+                    <button key={day} onClick={() => setSelectedDay(isSelected ? null : day)}
+                      className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-medium transition-all relative ${stateClasses}${laganOverlay}`}>
+                      {isLagan && !isToday && <GaneshIcon className="absolute top-0.5 right-0.5 w-2.5 h-2.5 text-orange-300" />}
+                      {day}
+                      {isBooked && <span className={`w-1 h-1 rounded-full mt-0.5 ${isPast ? "bg-emerald-500/40" : "bg-emerald-400"}`} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <button
+              onClick={() => user ? setMultiDateOpen(true) : navigate('/auth')}
+              className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />Add Multiple Dates
+            </button>
+            {!user && (
+              <button onClick={() => navigate('/auth')} className="w-full py-2 rounded-xl text-violet-300 text-xs hover:text-white transition-colors">
+                Sign up to manage your bookings →
+              </button>
+            )}
+          </div>
+
+          {/* Right column: Events panel */}
+          <div className="space-y-4">
+            {selectedDay !== null ? (
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {selectedDay} {monthName} — {selectedDayBookings.length > 0 ? `${selectedDayBookings.length} event${selectedDayBookings.length > 1 ? 's' : ''}` : "No events"}
+                </p>
+                {selectedDayBookings.map(booking => <BookingRow key={booking.id} booking={booking} />)}
+                {user && (
+                  <div className="bg-white/5 backdrop-blur rounded-xl p-4 border border-white/10">
+                    <p className="text-xs text-violet-300 mb-3">{selectedDayBookings.length > 0 ? 'Add another event:' : 'No event on this date. Add one:'}</p>
+                    <div className="flex gap-2">
+                      <input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Wedding at Kathmandu"
+                        className="flex-1 h-10 rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        onKeyDown={e => e.key === 'Enter' && handleAddEvent()} />
+                      <button onClick={handleAddEvent} disabled={!eventName.trim() || addBooking.isPending}
+                        className="h-10 w-10 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 flex items-center justify-center transition-colors">
+                        <Plus className="w-5 h-5 text-white" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : defaultBottomEvent ? (
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{defaultBottomEvent.label}</p>
+                {defaultBottomEvent.bookings.map(b => <BookingRow key={b.id} booking={b} showDate bsDate={defaultBottomEvent.bs} />)}
+              </div>
+            ) : null}
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
+                <List className="w-3.5 h-3.5" />Upcoming Events
+              </p>
+              {upcomingEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <CalendarDays className="w-10 h-10 mx-auto mb-2 text-violet-500/50" />
+                  <p className="text-white/40 text-sm">No upcoming events</p>
+                </div>
+              ) : upcomingEvents.map(b => {
+                const bs = adToBS(new Date(b.booking_date + 'T00:00:00'));
+                const daysUntil = Math.ceil((new Date(b.booking_date + 'T00:00:00').getTime() - new Date(new Date().toDateString()).getTime()) / (1000 * 60 * 60 * 24));
+                return (
+                  <div key={b.id}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${daysUntil === 0 ? "bg-rose-500/20 text-rose-300" : daysUntil <= 3 ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                        {daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil} days`}
+                      </span>
+                    </div>
+                    <BookingRow booking={b} showDate bsDate={bs} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Add Multiple Dates Button - show for everyone, gate action for guests */}
-      <div className="flex-shrink-0 px-4 pb-1">
+      {/* Add Multiple Dates Button — mobile only */}
+      <div className="flex-shrink-0 px-4 pb-1 md:hidden">
         <button
           onClick={() => user ? setMultiDateOpen(true) : navigate('/auth')}
           className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
@@ -588,9 +719,9 @@ export default function Index() {
         </button>
       </div>
 
-      {/* Guest CTA */}
+      {/* Guest CTA — mobile only */}
       {!user && (
-        <div className="flex-shrink-0 px-4 pb-1">
+        <div className="flex-shrink-0 px-4 pb-1 md:hidden">
           <button
             onClick={() => navigate('/auth')}
             className="w-full py-2 rounded-xl text-violet-300 text-xs hover:text-white transition-colors"
@@ -642,5 +773,6 @@ export default function Index() {
         />
       )}
     </div>
+    </>
   );
 }

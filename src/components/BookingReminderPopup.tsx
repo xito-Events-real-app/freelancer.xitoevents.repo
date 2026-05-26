@@ -155,8 +155,9 @@ export default function BookingReminderPopup() {
       await addMultiple.mutateAsync({ bookings: bookingsToAdd });
       toast({ title: '✅ Dates saved!', description: `${bookingsToAdd.length} date(s) added successfully.` });
       dismiss();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save dates.', variant: 'destructive' });
+    } catch (err: any) {
+      console.error('Failed to save booking dates:', err);
+      toast({ title: 'Error', description: err?.message || 'Failed to save dates.', variant: 'destructive' });
     }
   };
 

@@ -29,20 +29,33 @@ async function createBookingFeedPost(authorId: string, displayName: string | nul
   if (error) console.error('Failed to create booking feed post:', error);
 }
 
+/**
+ * Resolve the booking owner id: active company when present, otherwise the
+ * authenticated user (standalone freelancers). DB owner-shortcut RLS allows
+ * writes when user_id = auth.uid(), so freelancers can bypass the GUC path.
+ */
+function useBookingOwnerId(): string | null {
+  const { user } = useAuth();
+  const { activeAgencyId } = useActiveCompany();
+  return activeAgencyId ?? user?.id ?? null;
+}
+
 export function useBookings(_year: number, _month: number) {
+  const { user } = useAuth();
   const { activeAgencyId, switching } = useActiveCompany();
+  const ownerId = activeAgencyId ?? user?.id ?? null;
   return useQuery({
-    queryKey: keyForAgency('bookings', activeAgencyId),
+    queryKey: keyForAgency('bookings', ownerId),
     queryFn: async () => {
-      if (!activeAgencyId) return [];
+      if (!ownerId) return [];
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .eq('user_id', activeAgencyId);
+        .eq('user_id', ownerId);
       if (error) throw error;
       return (data || []) as Booking[];
     },
-    enabled: !!activeAgencyId && !switching,
+    enabled: !!ownerId && !switching,
     staleTime: 120_000,
   });
 }
@@ -54,17 +67,20 @@ export function useAddBooking() {
 
   return useMutation({
     mutationFn: async ({ booking_date, event_name }: { booking_date: string; event_name: string }) => {
-      if (!activeAgencyId) throw new Error('No active company');
-      const data = await withActiveAgency(activeAgencyId, async () => {
+      const ownerId = activeAgencyId ?? user?.id;
+      if (!ownerId) throw new Error('Not signed in');
+      const doInsert = async () => {
         const { data, error } = await supabase
           .from('bookings')
-          .insert({ user_id: activeAgencyId, booking_date, event_name })
+          .insert({ user_id: ownerId, booking_date, event_name })
           .select()
           .single();
         if (error) throw error;
         return data;
-      });
-      // Feed post is authored by the actor (not the company) so the actor's profile shows up
+      };
+      const data = activeAgencyId
+        ? await withActiveAgency(activeAgencyId, doInsert)
+        : await doInsert();
       const { data: profile } = await supabase
         .from('freelancer_profiles')
         .select('full_name')
@@ -87,13 +103,17 @@ export function useAddMultipleBookings() {
 
   return useMutation({
     mutationFn: async ({ bookings }: { bookings: { date: string; event_name: string }[] }) => {
-      if (!activeAgencyId) throw new Error('No active company');
-      const rows = bookings.map(b => ({ user_id: activeAgencyId, booking_date: b.date, event_name: b.event_name }));
-      const data = await withActiveAgency(activeAgencyId, async () => {
+      const ownerId = activeAgencyId ?? user?.id;
+      if (!ownerId) throw new Error('Not signed in');
+      const rows = bookings.map(b => ({ user_id: ownerId, booking_date: b.date, event_name: b.event_name }));
+      const doInsert = async () => {
         const { data, error } = await supabase.from('bookings').insert(rows).select();
         if (error) throw error;
         return data;
-      });
+      };
+      const data = activeAgencyId
+        ? await withActiveAgency(activeAgencyId, doInsert)
+        : await doInsert();
       if (data && data.length > 0) {
         const { data: profile } = await supabase
           .from('freelancer_profiles')
@@ -114,11 +134,13 @@ export function useAddMultipleBookings() {
 
 export function useUpdateBooking() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { activeAgencyId } = useActiveCompany();
   return useMutation({
     mutationFn: async ({ bookingId, event_name }: { bookingId: string; event_name: string }) => {
-      if (!activeAgencyId) throw new Error('No active company');
-      return withActiveAgency(activeAgencyId, async () => {
+      const ownerId = activeAgencyId ?? user?.id;
+      if (!ownerId) throw new Error('Not signed in');
+      const doUpdate = async () => {
         const { data, error } = await supabase
           .from('bookings')
           .update({ event_name })
@@ -127,7 +149,8 @@ export function useUpdateBooking() {
           .single();
         if (error) throw error;
         return data;
-      });
+      };
+      return activeAgencyId ? withActiveAgency(activeAgencyId, doUpdate) : doUpdate();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
@@ -137,17 +160,20 @@ export function useUpdateBooking() {
 
 export function useDeleteBooking() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { activeAgencyId } = useActiveCompany();
   return useMutation({
     mutationFn: async (bookingId: string) => {
-      if (!activeAgencyId) throw new Error('No active company');
-      return withActiveAgency(activeAgencyId, async () => {
+      const ownerId = activeAgencyId ?? user?.id;
+      if (!ownerId) throw new Error('Not signed in');
+      const doDelete = async () => {
         const { error } = await supabase
           .from('bookings')
           .delete()
           .eq('id', bookingId);
         if (error) throw error;
-      });
+      };
+      return activeAgencyId ? withActiveAgency(activeAgencyId, doDelete) : doDelete();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });

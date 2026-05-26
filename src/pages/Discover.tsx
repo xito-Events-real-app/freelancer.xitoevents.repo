@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, MapPin, ChevronRight, Filter, CalendarDays, X } from 'lucide-react';
 import DateSearchPicker from '@/components/DateSearchPicker';
 import InlineFollowButton from '@/components/InlineFollowButton';
+import { Helmet } from 'react-helmet-async';
 
 export default function Discover() {
   const [search, setSearch] = useState('');
@@ -74,10 +75,26 @@ export default function Discover() {
   }, [freelancers, searchDates, bookedUserIds]);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="px-4 pt-6 pb-4 bg-card border-b border-border">
-        <div className="max-w-lg lg:max-w-3xl mx-auto space-y-3">
-          <h1 className="text-xl font-bold text-foreground">Discover</h1>
+    <>
+    <Helmet>
+      <title>Discover Wedding Photographers & Videographers in Nepal | Xito</title>
+      <meta name="description" content="Browse and book Nepal's top wedding photographers, videographers, decorators and event creatives. Filter by skill, city and availability on Xito." />
+      <link rel="canonical" href="https://photography.xitoevents.com/discover" />
+      <meta property="og:title" content="Discover Wedding Creatives in Nepal — Xito" />
+      <meta property="og:description" content="Browse and book Nepal's top wedding photographers, videographers and event creatives." />
+      <meta property="og:url" content="https://photography.xitoevents.com/discover" />
+      <script type="application/ld+json">{JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "Discover Wedding Creatives in Nepal",
+        "url": "https://photography.xitoevents.com/discover",
+        "about": "Wedding photographers, videographers and event freelancers in Nepal"
+      })}</script>
+    </Helmet>
+    <div className="min-h-screen bg-background pb-6">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 bg-card border-b border-border">
+        <div className="max-w-xl lg:max-w-4xl mx-auto space-y-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Discover</h1>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -142,15 +159,15 @@ export default function Discover() {
         </div>
       </div>
 
-      <div className="px-4 py-4 max-w-lg lg:max-w-3xl mx-auto">
+      <div className="px-4 sm:px-6 py-4 max-w-xl lg:max-w-4xl mx-auto">
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
             ))}
           </div>
         ) : filteredFreelancers.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {filteredFreelancers.map(f => {
               const skills = SKILLS.filter(s => f[s.key] === 'YES');
               const counts = bookingCounts?.[f.user_id];
@@ -231,5 +248,6 @@ export default function Discover() {
         onConfirm={handleDateConfirm}
       />
     </div>
+    </>
   );
 }

@@ -526,11 +526,11 @@ export default function Market() {
 
   // ---- LIST VIEW ----
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="px-4 pt-6 pb-4 bg-gradient-to-r from-primary/5 via-card to-card border-b border-border">
-        <div className="max-w-lg lg:max-w-3xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-background pb-6">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 bg-gradient-to-r from-primary/5 via-card to-card border-b border-border">
+        <div className="max-w-xl lg:max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Market</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Market</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Find & post freelance jobs</p>
           </div>
           {user && (
@@ -546,10 +546,10 @@ export default function Market() {
         </div>
       </div>
 
-      <div className="px-4 py-4 max-w-lg lg:max-w-3xl mx-auto">
+      <div className="px-4 sm:px-6 py-4 max-w-xl lg:max-w-4xl mx-auto">
         {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />)}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(i => <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />)}
           </div>
         ) : (!posts || posts.length === 0) ? (
           <div className="text-center py-20">
@@ -558,7 +558,7 @@ export default function Market() {
             <p className="text-sm text-muted-foreground mt-1">Be the first to post!</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {posts.map(p => {
               const s = stats?.[p.id] || { views: 0, likes: 0, comments: 0, liked: false };
               return (
@@ -636,7 +636,7 @@ export default function Market() {
       {user && (
         <button
           onClick={() => setView('create')}
-          className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 transition-all hover:scale-105 z-40"
+          className="fixed bottom-6 right-4 sm:right-6 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 transition-all hover:scale-105 z-40"
         >
           <Plus className="w-6 h-6" />
         </button>

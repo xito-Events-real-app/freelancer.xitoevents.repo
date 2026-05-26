@@ -12,7 +12,7 @@ interface ViewModeContextType {
 const ViewModeContext = createContext<ViewModeContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'view-mode-preference';
-const DESKTOP_BREAKPOINT = 1024;
+const DESKTOP_BREAKPOINT = 768;
 
 function getEffective(mode: ViewMode, width: number): EffectiveMode {
   if (mode === 'auto') return width >= DESKTOP_BREAKPOINT ? 'desktop' : 'mobile';

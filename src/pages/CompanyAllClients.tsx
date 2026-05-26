@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSmartBack } from '@/hooks/useSmartBack';
 import { ChevronLeft, ChevronRight, X, ArrowUpDown, Plus, UserPlus, MessageCircle, Users, Trash2, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,8 +61,11 @@ export default function CompanyAllClients() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const currentBS = useMemo(() => getCurrentBSDate(), []);
-  const [bsYear, setBsYear] = useState(currentBS.year);
-  const [bsMonth, setBsMonth] = useState(currentBS.month);
+  const [searchParams] = useSearchParams();
+  const urlMonth = Number(searchParams.get('bsMonth'));
+  const urlYear = Number(searchParams.get('bsYear'));
+  const [bsYear, setBsYear] = useState(urlYear && urlYear >= 2079 && urlYear <= 2099 ? urlYear : currentBS.year);
+  const [bsMonth, setBsMonth] = useState(urlMonth && urlMonth >= 1 && urlMonth <= 12 ? urlMonth : currentBS.month);
   const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterClient, setFilterClient] = useState<string | null>(null);
   const [filterFreelancer, setFilterFreelancer] = useState<string | null>(null);

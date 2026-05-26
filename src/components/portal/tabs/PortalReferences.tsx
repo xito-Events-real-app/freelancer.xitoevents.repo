@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { portalApi, type PortalContext } from '@/lib/portalClient';
+import {
+  portalApi,
+  uploadPortalPhoto,
+  deletePortalReference,
+  type PortalContext,
+} from '@/lib/portalClient';
+import { compressImage } from '@/lib/imageCompressor';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,53 +20,68 @@ import {
 
 interface Props { data: any; ctx: PortalContext; onChange: () => void; }
 
-const PLATS = [
-  { id: 'instagram', label: 'Instagram', icon: '📷' },
-  { id: 'youtube', label: 'YouTube', icon: '▶️' },
-  { id: 'pinterest', label: 'Pinterest', icon: '📌' },
-  { id: 'tiktok', label: 'TikTok', icon: '🎵' },
-  { id: 'website', label: 'Website', icon: '🌐' },
-  { id: 'other', label: 'Other', icon: '🔗' },
-];
+const PLATS: Record<string, { label: string; icon: string }> = {
+  instagram: { label: 'Instagram', icon: '📷' },
+  youtube: { label: 'YouTube', icon: '▶️' },
+  pinterest: { label: 'Pinterest', icon: '📌' },
+  tiktok: { label: 'TikTok', icon: '🎵' },
+  website: { label: 'Website', icon: '🌐' },
+  other: { label: 'Link', icon: '🔗' },
+};
+
+function detectPlatform(url: string): string {
+  const u = url.toLowerCase();
+  if (u.includes('instagram.')) return 'instagram';
+  if (u.includes('youtube.') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('pinterest.')) return 'pinterest';
+  if (u.includes('tiktok.')) return 'tiktok';
+  if (/^(https?:\/\/)?[^\s/]+\.[^\s]+/.test(u)) return 'website';
+  return 'other';
+}
 
 export default function PortalReferences({ data, ctx, onChange }: Props) {
   const refs: any[] = data.references || [];
   const events: any[] = data.events || [];
 
-  const tabs = useMemo(() => [{ key: '', label: 'General' }, ...events.map((e) => ({ key: e.event_name, label: e.event_name }))], [events]);
+  const tabs = useMemo(
+    () => [{ key: '', label: 'General' }, ...events.map((e) => ({ key: e.event_name, label: e.event_name }))],
+    [events],
+  );
 
   const [activeEv, setActiveEv] = useState('');
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [showDemandForm, setShowDemandForm] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
-  const [linkTitle, setLinkTitle] = useState('');
-  const [selPlat, setSelPlat] = useState('instagram');
   const [demandText, setDemandText] = useState('');
 
-  // Edit state — one item at a time.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editUrl, setEditUrl] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-  const [editPlat, setEditPlat] = useState('instagram');
 
-  // Delete confirm state.
-  const [confirm, setConfirm] = useState<{ id: string; label: string } | null>(null);
+  const [confirm, setConfirm] = useState<{ id: string; label: string; hasPhoto?: boolean } | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const filtered = refs.filter((r) => (r.event_name || '') === activeEv);
+  const photos = filtered.filter((r) => r.entry_type === 'photo' && r.image_url);
   const links = filtered.filter((r) => r.entry_type === 'link');
   const demands = filtered.filter((r) => r.entry_type === 'note' || r.entry_type === 'demand');
 
   const saveLink = async () => {
-    if (!linkUrl.trim()) return toast.error('Please enter a URL');
+    const url = linkUrl.trim();
+    if (!url) return toast.error('Please enter a URL');
     try {
       await portalApi.addReference(ctx, {
-        entry_type: 'link', platform: selPlat,
-        link_url: linkUrl.trim(), link_title: linkTitle.trim() || linkUrl.trim(),
+        entry_type: 'link',
+        platform: detectPlatform(url),
+        link_url: url,
+        link_title: '',
         event_name: activeEv || null,
       });
-      setLinkUrl(''); setLinkTitle(''); setShowLinkForm(false);
-      toast.success('Reference added!');
+      setLinkUrl(''); setShowLinkForm(false);
+      toast.success('Link added!');
       onChange();
     } catch (e: any) { toast.error(e.message); }
   };
@@ -69,9 +90,7 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
     if (!demandText.trim()) return toast.error('Please write something');
     try {
       await portalApi.addReference(ctx, {
-        entry_type: 'note',
-        description: demandText.trim(),
-        event_name: activeEv || null,
+        entry_type: 'note', description: demandText.trim(), event_name: activeEv || null,
       });
       setDemandText(''); setShowDemandForm(false);
       toast.success('Note added!');
@@ -79,17 +98,9 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const beginEditNote = (r: any) => {
-    setEditingId(r.id);
-    setEditText(r.description || '');
-  };
-  const beginEditLink = (r: any) => {
-    setEditingId(r.id);
-    setEditUrl(r.link_url || '');
-    setEditTitle(r.link_title || '');
-    setEditPlat(r.platform || 'instagram');
-  };
-  const cancelEdit = () => { setEditingId(null); setEditText(''); setEditUrl(''); setEditTitle(''); };
+  const beginEditNote = (r: any) => { setEditingId(r.id); setEditText(r.description || ''); };
+  const beginEditLink = (r: any) => { setEditingId(r.id); setEditUrl(r.link_url || ''); };
+  const cancelEdit = () => { setEditingId(null); setEditText(''); setEditUrl(''); };
 
   const saveEditNote = async (oldId: string, eventName: string | null) => {
     const text = editText.trim();
@@ -99,9 +110,7 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
         entry_type: 'note', description: text, event_name: eventName || null,
       });
       await portalApi.deleteReference(ctx, oldId);
-      cancelEdit();
-      toast.success('Saved');
-      onChange();
+      cancelEdit(); toast.success('Saved'); onChange();
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -110,25 +119,54 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
     if (!url) return toast.error('Please enter a URL');
     try {
       await portalApi.addReference(ctx, {
-        entry_type: 'link', platform: editPlat,
-        link_url: url, link_title: editTitle.trim() || url,
+        entry_type: 'link',
+        platform: detectPlatform(url),
+        link_url: url,
+        link_title: '',
         event_name: eventName || null,
       });
       await portalApi.deleteReference(ctx, oldId);
-      cancelEdit();
-      toast.success('Saved');
-      onChange();
+      cancelEdit(); toast.success('Saved'); onChange();
     } catch (e: any) { toast.error(e.message); }
   };
 
   const doDelete = async () => {
     if (!confirm) return;
     try {
-      await portalApi.deleteReference(ctx, confirm.id);
-      setConfirm(null);
-      toast.success('Deleted');
-      onChange();
+      if (confirm.hasPhoto) {
+        await deletePortalReference(ctx, confirm.id);
+      } else {
+        await portalApi.deleteReference(ctx, confirm.id);
+      }
+      setConfirm(null); toast.success('Deleted'); onChange();
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
+    setUploading(true);
+    setUploadProgress({ done: 0, total: list.length });
+    let okCount = 0;
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      try {
+        const compressed = await compressImage(f);
+        const refId = await portalApi.createReferencePhoto(ctx, activeEv || '');
+        const { url } = await uploadPortalPhoto(ctx, compressed, 'reference', { refId });
+        await portalApi.setReferenceImage(ctx, refId, url);
+        okCount++;
+      } catch (e: any) {
+        toast.error(`${f.name}: ${e.message || 'Upload failed'}`);
+      }
+      setUploadProgress({ done: i + 1, total: list.length });
+    }
+    setUploading(false);
+    if (okCount > 0) {
+      toast.success(`${okCount} photo${okCount > 1 ? 's' : ''} uploaded`);
+      onChange();
+    }
+    if (fileRef.current) fileRef.current.value = '';
   };
 
   const actionBtn: React.CSSProperties = {
@@ -136,9 +174,7 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
     borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer',
     color: '#475569', flexShrink: 0,
   };
-  const dangerBtn: React.CSSProperties = {
-    ...actionBtn, color: '#dc2626', borderColor: '#fecaca',
-  };
+  const dangerBtn: React.CSSProperties = { ...actionBtn, color: '#dc2626', borderColor: '#fecaca' };
 
   return (
     <>
@@ -162,6 +198,86 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
         </div>
       </div>
 
+      {/* ===== Photos (TOP) ===== */}
+      <div className="cp-rsec">
+        <div className="cp-rsh">
+          <div className="cp-rst">Reference Photos</div>
+          {photos.length > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--cp-text-3)' }}>{photos.length}</span>
+          )}
+        </div>
+
+        {photos.length === 0 ? (
+          <div className="cp-es"><div className="ic">🖼️</div><p>No reference photos yet</p></div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            {photos.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  position: 'relative',
+                  aspectRatio: '1 / 1',
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: 'var(--rose-faint)',
+                  border: '1px solid var(--cp-border)',
+                }}
+              >
+                <img
+                  src={r.image_url}
+                  alt="reference"
+                  onClick={() => setLightbox(r.image_url)}
+                  style={{
+                    width: '100%', height: '100%', objectFit: 'cover',
+                    cursor: 'zoom-in', display: 'block',
+                  }}
+                />
+                <button
+                  onClick={() => setConfirm({ id: r.id, label: 'this photo', hasPhoto: true })}
+                  aria-label="Delete photo"
+                  style={{
+                    position: 'absolute', top: 4, right: 4,
+                    width: 24, height: 24, borderRadius: 999,
+                    border: 'none', background: 'rgba(0,0,0,.55)',
+                    color: '#fff', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12,
+                  }}
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Upload button at the BOTTOM */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,.heic,.heif"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        <button
+          className="cp-alb"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          style={{ width: '100%', justifyContent: 'center', display: 'flex', gap: 6 }}
+        >
+          {uploading
+            ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…`
+            : '📷  Upload Photos'}
+        </button>
+      </div>
+
+      {/* ===== Links ===== */}
       <div className="cp-rsec">
         <div className="cp-rsh">
           <div className="cp-rst">Reference Links</div>
@@ -169,19 +285,15 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
         </div>
         {showLinkForm && (
           <div className="cp-af">
-            <div className="cp-pbtns">
-              {PLATS.map((p) => (
-                <button
-                  key={p.id}
-                  className={`cp-pb ${p.id === selPlat ? 'active' : ''}`}
-                  onClick={() => setSelPlat(p.id)}
-                >{p.icon} {p.label}</button>
-              ))}
-            </div>
-            <input type="url" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Paste link here…" />
-            <input type="text" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} placeholder="Title (optional)" />
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="Paste link here…"
+              autoFocus
+            />
             <div className="cp-fa">
-              <button onClick={() => setShowLinkForm(false)}>Cancel</button>
+              <button onClick={() => { setShowLinkForm(false); setLinkUrl(''); }}>Cancel</button>
               <button className="sv" onClick={saveLink}>Save</button>
             </div>
           </div>
@@ -189,22 +301,12 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
         {links.length === 0 ? (
           <div className="cp-es"><div className="ic">🔗</div><p>No reference links yet</p></div>
         ) : links.map((r) => {
-          const p = PLATS.find((x) => x.id === r.platform) || PLATS[5];
+          const p = PLATS[r.platform || 'other'] || PLATS.other;
           const isEditing = editingId === r.id;
           if (isEditing) {
             return (
               <div className="cp-af" key={r.id} style={{ marginBottom: 10 }}>
-                <div className="cp-pbtns">
-                  {PLATS.map((pp) => (
-                    <button
-                      key={pp.id}
-                      className={`cp-pb ${pp.id === editPlat ? 'active' : ''}`}
-                      onClick={() => setEditPlat(pp.id)}
-                    >{pp.icon} {pp.label}</button>
-                  ))}
-                </div>
-                <input type="url" value={editUrl} onChange={(e) => setEditUrl(e.target.value)} placeholder="Paste link here…" />
-                <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title (optional)" />
+                <input type="url" value={editUrl} onChange={(e) => setEditUrl(e.target.value)} placeholder="Paste link here…" autoFocus />
                 <div className="cp-fa">
                   <button onClick={cancelEdit}>Cancel</button>
                   <button className="sv" onClick={() => saveEditLink(r.id, r.event_name)}>Save</button>
@@ -216,17 +318,18 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
             <div className="cp-rcard" key={r.id}>
               <span className="cp-rpi">{p.icon}</span>
               <div className="cp-rcb">
-                <div className="cp-rct">{r.link_title || r.link_url}</div>
-                {r.link_title && <div className="cp-rcu">{r.link_url}</div>}
+                <div className="cp-rct" style={{ wordBreak: 'break-all' }}>{r.link_url}</div>
+                <div className="cp-rcu">{p.label}</div>
               </div>
               <a href={r.link_url?.startsWith('http') ? r.link_url : `https://${r.link_url}`} target="_blank" rel="noreferrer" style={{ fontSize: 14, textDecoration: 'none', padding: 4 }}>↗</a>
-              <button onClick={() => beginEditLink(r)} style={actionBtn}>✎ Edit</button>
-              <button onClick={() => setConfirm({ id: r.id, label: r.link_title || r.link_url })} style={dangerBtn}>🗑</button>
+              <button onClick={() => beginEditLink(r)} style={actionBtn}>✎</button>
+              <button onClick={() => setConfirm({ id: r.id, label: r.link_url })} style={dangerBtn}>🗑</button>
             </div>
           );
         })}
       </div>
 
+      {/* ===== Notes ===== */}
       <div className="cp-rsec">
         <div className="cp-rsh">
           <div className="cp-rst">My Demands &amp; Notes</div>
@@ -234,12 +337,7 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
         </div>
         {showDemandForm && (
           <div className="cp-af">
-            <textarea
-              rows={4}
-              value={demandText}
-              onChange={(e) => setDemandText(e.target.value)}
-              placeholder="Describe your ideas, demands, or special requests..."
-            />
+            <textarea rows={4} value={demandText} onChange={(e) => setDemandText(e.target.value)} placeholder="Describe your ideas, demands, or special requests..." />
             <div className="cp-fa">
               <button onClick={() => setShowDemandForm(false)}>Cancel</button>
               <button className="sv" onClick={saveDemand}>Save</button>
@@ -253,11 +351,7 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
           if (isEditing) {
             return (
               <div className="cp-af" key={r.id} style={{ marginBottom: 10 }}>
-                <textarea
-                  rows={4}
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                />
+                <textarea rows={4} value={editText} onChange={(e) => setEditText(e.target.value)} />
                 <div className="cp-fa">
                   <button onClick={cancelEdit}>Cancel</button>
                   <button className="sv" onClick={() => saveEditNote(r.id, r.event_name)}>Save</button>
@@ -290,6 +384,19 @@ export default function PortalReferences({ data, ctx, onChange }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.9)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, cursor: 'zoom-out', padding: 16,
+          }}
+        >
+          <img src={lightbox} alt="reference" style={{ maxWidth: '95vw', maxHeight: '90vh', objectFit: 'contain' }} />
+        </div>
+      )}
     </>
   );
 }

@@ -78,10 +78,7 @@ export function useMyProfile() {
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
-      if (error) {
-        console.warn('[useMyProfile] Query failed:', error.message);
-        throw error;
-      }
+      if (error) throw error;
       return (data ?? null) as FreelancerProfile | null;
     },
     enabled: !!user,

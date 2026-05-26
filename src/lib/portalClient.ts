@@ -52,7 +52,106 @@ export const portalApi = {
 
   unhideVideo: (ctx: PortalContext, videoId: string) =>
     rpc('portal_unhide_video', { p_client: ctx.clientId, p_token: ctx.token, p_video_id: videoId }),
+
+  // Couple & family photos
+  setCouplePhoto: (ctx: PortalContext, url: string) =>
+    rpc('portal_set_couple_photo', { p_client: ctx.clientId, p_token: ctx.token, p_url: url }),
+
+  addFamilyMember: (ctx: PortalContext, side: string, role: string, name: string) =>
+    rpc<string>('portal_add_family_member', {
+      p_client: ctx.clientId, p_token: ctx.token,
+      p_side: side, p_role: role, p_name: name,
+    }),
+
+  setFamilyMemberPhoto: (ctx: PortalContext, memberId: string, url: string) =>
+    rpc('portal_set_family_member_photo', {
+      p_client: ctx.clientId, p_token: ctx.token, p_member_id: memberId, p_url: url,
+    }),
+
+  createReferencePhoto: (ctx: PortalContext, eventName: string) =>
+    rpc<string>('portal_create_reference_photo', {
+      p_client: ctx.clientId, p_token: ctx.token, p_event_name: eventName,
+    }),
+
+  setReferenceImage: (ctx: PortalContext, refId: string, url: string) =>
+    rpc('portal_set_reference_image', {
+      p_client: ctx.clientId, p_token: ctx.token, p_ref_id: refId, p_url: url,
+    }),
+
+  updateFamilyMember: (ctx: PortalContext, memberId: string, side: string, role: string, name: string) =>
+    rpc('portal_update_family_member', {
+      p_client: ctx.clientId, p_token: ctx.token, p_member_id: memberId,
+      p_side: side, p_role: role, p_name: name,
+    }),
 };
+
+const PHOTO_BUCKET = 'xito-photography-xitoevents-com';
+const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+/**
+ * Upload a (already compressed) photo to the photography R2 bucket via
+ * the upload-media edge function. Returns the public URL.
+ * `kind` is either 'couple' or 'family' (for family, pass memberId).
+ */
+export async function uploadPortalPhoto(
+  ctx: PortalContext,
+  file: File,
+  kind: 'couple' | 'family' | 'reference',
+  opts?: { memberId?: string; refId?: string },
+): Promise<{ url: string; key: string }> {
+  const fd = new FormData();
+  fd.append('bucket', PHOTO_BUCKET);
+  fd.append('client_id', ctx.clientId);
+  fd.append('token', ctx.token);
+  fd.append('kind', kind);
+  if (opts?.memberId) fd.append('member_id', opts.memberId);
+  if (opts?.refId) fd.append('ref_id', opts.refId);
+  fd.append('file', file);
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-media`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON },
+    body: fd,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || 'Upload failed');
+  return { url: json.url, key: json.key };
+}
+
+/** Delete a reference (including its R2 image, if any). */
+export async function deletePortalReference(ctx: PortalContext, refId: string): Promise<void> {
+  const fd = new FormData();
+  fd.append('bucket', PHOTO_BUCKET);
+  fd.append('client_id', ctx.clientId);
+  fd.append('token', ctx.token);
+  fd.append('kind', 'delete-reference');
+  fd.append('ref_id', refId);
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-media`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON },
+    body: fd,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || 'Delete failed');
+}
+
+/** Delete a family member via the edge function (deletes DB row + R2 object). */
+export async function deletePortalFamilyMember(ctx: PortalContext, memberId: string): Promise<void> {
+  const fd = new FormData();
+  fd.append('bucket', PHOTO_BUCKET);
+  fd.append('client_id', ctx.clientId);
+  fd.append('token', ctx.token);
+  fd.append('kind', 'delete-family');
+  fd.append('member_id', memberId);
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-media`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON },
+    body: fd,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || 'Delete failed');
+}
+
 
 // Owner-side
 export const portalAdminApi = {
